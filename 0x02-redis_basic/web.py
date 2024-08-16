@@ -1,54 +1,45 @@
 #!/usr/bin/env python3
-"""In this tasks, we will implement a get_page function
-(prototype: def get_page(url: str) -> str:). The core of
-the function is very simple. It uses the requests module
-to obtain the HTML content of a particular URL and returns it.
+# -*- coding: utf-8 -*-
+"""
+Created on Wed July  19 19:00:00 2023
 
-Start in a new file named web.py and do not reuse the code
-written in exercise.py.
-
-Inside get_page track how many times a particular URL was
-accessed in the key "count:{url}" and cache the result with
-an expiration time of 10 seconds.
-
-Tip: Use http://slowwly.robertomurray.co.uk to simulate
-a slow response and test your caching."""
-
-
+@Author: Nicanor Kyamba
+"""
+from functools import wraps
 import redis
 import requests
-from functools import wraps
 
-r = redis.Redis()
+redis_client = redis.Redis()
 
 
-def url_access_count(method):
-    """decorator for get_page function"""
+def count_requests(method):
+    """ Decorator for counting """
     @wraps(method)
     def wrapper(url):
-        """wrapper function"""
-        key = "cached:" + url
-        cached_value = r.get(key)
-        if cached_value:
-            return cached_value.decode("utf-8")
+        key_count = f"count:{url}"
+        key_cached = f"cached:{url}"
 
-            # Get new content and update cache
-        key_count = "count:" + url
+        cached_value = redis_client.get(key_cached)
+        if cached_value:
+            return cached_value.decode('utf-8')
+
         html_content = method(url)
 
-        r.incr(key_count)
-        r.set(key, html_content, ex=10)
-        r.expire(key, 10)
+        redis_client.incr(key_count)
+        redis_client.setex(key_cached, 10, html_content)
+
         return html_content
+
     return wrapper
 
 
-@url_access_count
+@count_requests
 def get_page(url: str) -> str:
-    """obtain the HTML content of a particular"""
-    results = requests.get(url)
-    return results.text
+    """ Obtain the HTML content of a  URL """
+    response = requests.get(url, timeout=10)
+    return response.text
 
 
-if __name__ == "__main__":
-    get_page('http://slowwly.robertomurray.co.uk')
+if __name__ == '__main__':
+    URL = 'http://slowwly.robertomurray.co.uk'
+    print(get_page(URL))
